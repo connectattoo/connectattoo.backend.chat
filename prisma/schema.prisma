@@ -1,0 +1,95 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_URL")
+}
+
+model Profile {
+  id                    String                  @id @default(uuid())
+  name                  String //só pra identificar quem é quem
+  lastSeenAt            DateTime?
+  conversationOnProfile ConversationOnProfile[]
+  messages              Message[]
+  ChatSettings          ChatSettings?
+  blockedConversation   BlockedConversation[]
+}
+
+model ChatSettings {
+  id String @id @default(uuid())
+
+  notify Boolean @default(true)
+
+  profile   Profile @relation(fields: [profileId], references: [id])
+  profileId String  @unique
+}
+
+model BlockedConversation {
+  id      String  @id @default(uuid())
+  blocked Boolean @default(false)
+
+  profile        Profile      @relation(fields: [profileId], references: [id])
+  profileId      String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  conversationId String
+
+  // @@index([profileId, conversationId])
+}
+
+model ConversationOnProfile {
+  id      String  @id @default(uuid())
+  deleted Boolean @default(false)
+
+  profile        Profile      @relation(fields: [profileId], references: [id])
+  profileId      String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  conversationId String
+  history        History?     @relation(fields: [historyId], references: [id], onDelete: SetNull)
+  historyId      String?      @unique
+}
+
+model Conversation {
+  id                  String                  @id @default(uuid())
+  participants        ConversationOnProfile[]
+  blockedConversation BlockedConversation[]
+}
+
+//não remover para não perder funcionalidade de "deletar conversa" ou "deletar historico sem deletar conversa"
+model History {
+  id String @id @default(uuid())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  conversationOnProfiles ConversationOnProfile?
+  messageHistory         MessageHistory[]
+}
+
+model MessageHistory {
+  id         String    @id @default(uuid())
+  viewedAt   DateTime?
+  receivedAt DateTime?
+
+  history   History @relation(fields: [historyId], references: [id], onDelete: Cascade)
+  historyId String
+  message   Message @relation(fields: [messageId], references: [id])
+  messageId String
+}
+
+model Message {
+  id      String @id @default(uuid())
+  content String
+
+  from           Profile          @relation(fields: [fromId], references: [id])
+  fromId         String
+  createdAt      DateTime         @default(now())
+  messageHistory MessageHistory[]
+}
